@@ -16,7 +16,7 @@ from scripts.processor import (
     get_purchase_count_weekly, get_purchase_count_monthly,
     has_purchase_content_data, get_purchase_contents_pages_data, get_a_content_target_purchase_data, get_purchase_age_gender_heatmap,get_purchase_age_gender_heatmap_page_data,  # 구매 컨텐츠 추가
     has_revenue_data, get_spend_and_revenue_weekly, get_spend_and_revenue_monthly,  # 광고/매출금액 추가
-    has_follower_demographics_data, get_follower_demographics_latest_date, get_demographics_ratio, get_follower_age_gender_known_only, get_age_known_unknown_by_age  # 팔로워 인구통계 추가
+    has_follower_demographics_data, get_follower_demographics_latest_date, get_demographics_ratio, get_follower_age_gender_known_only, get_age_known_unknown_by_age, get_follower_age_gender_distribution  # 팔로워 인구통계 추가
 )
 
 def run(target_id, fb_ad_account_id, start, end, main_age="", main_gender="", avoid_age="", avoid_gender="", currency=""):
@@ -156,12 +156,13 @@ def run(target_id, fb_ad_account_id, start, end, main_age="", main_gender="", av
     if has_follower_demographics_data(target_id, start, end):
         print("팔로워 인구통계학 데이터 생성 중...")
 
-        gender_clean_df = get_demographics_ratio(target_id, "gender", "exclude_unknown")
-        age_gender_clean_df = get_follower_age_gender_known_only(target_id)
-        gender_unknown_df = get_demographics_ratio(target_id, "gender", "unknown_vs_known")
-        age_known_unknown_df = get_age_known_unknown_by_age(target_id)
+        gender_clean_df = get_demographics_ratio(target_id, start, end, "gender", "exclude_unknown")
+        age_gender_clean_df = get_follower_age_gender_known_only(target_id, start, end)
+        gender_unknown_df = get_demographics_ratio(target_id, start, end, "gender", "unknown_vs_known")
+        age_known_unknown_df = get_age_known_unknown_by_age(target_id, start, end)
 
         follower_demo_latest_date = get_follower_demographics_latest_date(target_id, start, end)
+        age_gender_distribution_df = get_follower_age_gender_distribution(target_id, start, end)
 
         # 좌상: 성별 비율 (알 수 없음 제외) + 가운데 현재 팔로워 수
         if gender_clean_df is not None:
@@ -186,6 +187,18 @@ def run(target_id, fb_ad_account_id, start, end, main_age="", main_gender="", av
                 "series": [
                     {"name": "male", "data": age_gender_clean_df["male"].astype(float).tolist()},
                     {"name": "female", "data": age_gender_clean_df["female"].astype(float).tolist()}
+                ],
+                "unit": "명"
+            }
+        
+        if age_gender_distribution_df is not None:
+            datasets["age_gender_distribution"] = {
+                "chart_type": "stacked_barh",
+                "title": "연령대별 팔로워 분포(성별 구성)",
+                "labels": age_gender_distribution_df["age_range"].astype(str).tolist(),
+                "series": [
+                    {"name": "male", "data": age_gender_distribution_df["male"].astype(float).tolist()},
+                    {"name": "female", "data": age_gender_distribution_df["female"].astype(float).tolist()},
                 ],
                 "unit": "명"
             }

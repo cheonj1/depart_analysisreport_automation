@@ -26,10 +26,10 @@ DEFAULT_THEME = "#4e73df"
 def _configure_matplotlib_fonts() -> None:
     # Prefer Korean-capable fonts to avoid broken glyphs in SVG.
     preferred = [
-        "Apple SD Gothic Neo",
+        #"Apple SD Gothic Neo",
         "Noto Sans KR",
         "Malgun Gothic",
-        "Arial Unicode MS",
+        #"Arial Unicode MS",
         "DejaVu Sans",
     ]
     plt.rcParams["font.family"] = preferred
@@ -1194,15 +1194,13 @@ def render_follower_age_gender_stacked_barh_chart(chart_data, color_map):
     df["age_order"] = df["age_range"].apply(lambda x: age_order.index(x) if x in age_order else 99)
     df = df.sort_values("age_order", ascending=False)
 
-    for i in range(len(normalized)):
-        df[f"p{i}"] = (df[f"v{i}"] / df["total"] * 100).fillna(0)
-
     y = np.arange(len(df))
     fig, ax = plt.subplots(figsize=(7.5, 5))
 
     left = np.zeros(len(df))
     for i, (display_name, data, color, text_color) in enumerate(normalized):
-        vals = df[f"p{i}"].tolist()
+        vals = df[f"v{i}"].tolist()
+
         ax.barh(
             y, vals, left=left,
             color=color, edgecolor="none", height=0.89,
@@ -1210,20 +1208,21 @@ def render_follower_age_gender_stacked_barh_chart(chart_data, color_map):
         )
 
         for j, v in enumerate(vals):
-            if v >= 8:
+            if v >= max(df["total"]) * 0.08:   # 너무 작은 값은 라벨 생략
                 ax.text(
-                    left[j] + v / 2, j, f"{v:.0f}%",
+                    left[j] + v / 2, j, f"{int(v):,}",
                     ha="center", va="center",
-                    fontsize=15, color=text_color, fontweight="bold"
+                    fontsize=13, color=text_color, fontweight="bold"
                 )
         left += np.array(vals)
 
     ax.set_yticks(y)
     ax.set_yticklabels(df["age_range"].astype(str).tolist(), fontsize=14)
-    ax.set_xlim(0, 100)
-    ax.set_xticks([0, 20, 40, 60, 80, 100])
-    ax.set_xticklabels([f"{v}%" for v in [0, 20, 40, 60, 80, 100]], fontsize=13, color="#666666")
 
+    max_total = df["total"].max()
+    ax.set_xlim(0, max_total * 1.12)
+
+    ax.tick_params(axis="x", labelsize=13, colors="#666666")
     ax.grid(axis="x", linestyle="--", alpha=0.18)
     ax.set_axisbelow(True)
 

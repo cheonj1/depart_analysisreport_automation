@@ -1594,62 +1594,78 @@ def get_purchase_contents_pages_data(account_id, date_start, date_end):
 # 팔로워 인구통계학 페이지용 함수들
 # 기준: fb_ad_account_id의 가장 최근 created_at 데이터
 # ----------------------------------
-
-def has_follower_demographics_data(account_id, date_start,date_end):
+def has_follower_demographics_data(account_id, date_start, date_end):
     engine = get_engine()
 
-    query = f"""
+    query = """
         SELECT 1
         FROM followers_demographics_daily fdd
         JOIN ig_account ia
           ON fdd.ig_id = ia.ig_id
         JOIN ad_account aa
           ON ia.business_id = aa.business_id
-        WHERE aa.account_id = {account_id}
-        AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= '{date_start}'
-        AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= (DATE_TRUNC('week', '{date_end}'::date) - INTERVAL '1 day')::date
+        WHERE aa.account_id = %(account_id)s
+          AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+          AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
         LIMIT 1
     """
 
-    df = pd.read_sql(query, engine)
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
     return not df.empty
 
 
 def get_follower_demographics_latest_date(account_id, date_start, date_end):
     engine = get_engine()
 
-    query = f"""
-        SELECT MAX(fdd.created_at::date) AS latest_date
+    query = """
+        SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS latest_date
         FROM followers_demographics_daily fdd
         JOIN ig_account ia
           ON fdd.ig_id = ia.ig_id
         JOIN ad_account aa
           ON ia.business_id = aa.business_id
-        WHERE aa.account_id = {account_id}
-        AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= '{date_start}'
-        AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= (DATE_TRUNC('week', '{date_end}'::date) - INTERVAL '1 day')::date
+        WHERE aa.account_id = %(account_id)s
+          AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+          AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
     """
 
-    df = pd.read_sql(query, engine)
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
 
     if df.empty or pd.isna(df.loc[0, "latest_date"]):
         return None
 
     return str(df.loc[0, "latest_date"])
 
-def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown"):
+
+def get_demographics_ratio(account_id, date_start, date_end, dimension="gender", mode="exclude_unknown"):
     engine = get_engine()
 
     if dimension == "gender":
         category_expr = """
             CASE
-                WHEN fdd.gender = 'F' THEN '여성'
-                WHEN fdd.gender = 'M' THEN '남성'
+                WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) = 'F' THEN '여성'
+                WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) = 'M' THEN '남성'
                 ELSE '알 수 없음'
             END
         """
-        known_condition = "fdd.gender IN ('F', 'M')"
-        unknown_condition = "fdd.gender NOT IN ('F', 'M')"
+        known_condition = "TRIM(UPPER(COALESCE(fdd.gender, ''))) IN ('F', 'M')"
+        unknown_condition = "TRIM(UPPER(COALESCE(fdd.gender, ''))) NOT IN ('F', 'M')"
 
     elif dimension == "age":
         category_expr = "COALESCE(fdd.age_range, 'Unknown')"
@@ -1662,13 +1678,15 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
     if mode == "exclude_unknown":
         query = f"""
             WITH latest_dt AS (
-                SELECT MAX(fdd.created_at::date) AS dt
+                SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS dt
                 FROM followers_demographics_daily fdd
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
                   ON ia.business_id = aa.business_id
                 WHERE aa.account_id = %(account_id)s
+                  AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+                  AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
             ),
             base AS (
                 SELECT
@@ -1680,7 +1698,7 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
                 JOIN ad_account aa
                   ON ia.business_id = aa.business_id
                 JOIN latest_dt l
-                  ON fdd.created_at::date = l.dt
+                  ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
                 WHERE aa.account_id = %(account_id)s
                   AND {known_condition}
                 GROUP BY category
@@ -1691,7 +1709,7 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
             SELECT
                 category,
                 value,
-                ROUND(value * 100.0 / total, 1) AS ratio
+                ROUND(value * 100.0 / NULLIF(total, 0), 1) AS ratio
             FROM base, total
         """
 
@@ -1700,13 +1718,15 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
 
         query = f"""
             WITH latest_dt AS (
-                SELECT MAX(fdd.created_at::date) AS dt
+                SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS dt
                 FROM followers_demographics_daily fdd
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
                   ON ia.business_id = aa.business_id
                 WHERE aa.account_id = %(account_id)s
+                  AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+                  AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
             ),
             base AS (
                 SELECT
@@ -1721,7 +1741,7 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
                 JOIN ad_account aa
                   ON ia.business_id = aa.business_id
                 JOIN latest_dt l
-                  ON fdd.created_at::date = l.dt
+                  ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
                 WHERE aa.account_id = %(account_id)s
                 GROUP BY category
             ),
@@ -1731,7 +1751,7 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
             SELECT
                 category,
                 value,
-                ROUND(value * 100.0 / total, 1) AS ratio
+                ROUND(value * 100.0 / NULLIF(total, 0), 1) AS ratio
             FROM base, total
             ORDER BY CASE category
                 WHEN '{known_label}' THEN 1
@@ -1743,7 +1763,15 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
     else:
         raise ValueError("mode must be 'exclude_unknown' or 'unknown_vs_known'")
 
-    df = pd.read_sql(query, engine, params={"account_id": account_id})
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
 
     if df.empty:
         return None
@@ -1764,25 +1792,27 @@ def get_demographics_ratio(account_id, dimension="gender", mode="exclude_unknown
     return df
 
 
-def get_follower_age_gender_known_only(account_id):
+def get_follower_age_gender_known_only(account_id, date_start, date_end):
     engine = get_engine()
 
     query = """
         WITH latest_dt AS (
-            SELECT MAX(fdd.created_at::date) AS dt
+            SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS dt
             FROM followers_demographics_daily fdd
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
               ON ia.business_id = aa.business_id
             WHERE aa.account_id = %(account_id)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
         ),
         base AS (
             SELECT
                 COALESCE(fdd.age_range, 'Unknown') AS age_range,
                 CASE
-                    WHEN fdd.gender = 'M' THEN '남성'
-                    WHEN fdd.gender = 'F' THEN '여성'
+                    WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) = 'M' THEN '남성'
+                    WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) = 'F' THEN '여성'
                 END AS gender,
                 SUM(fdd.value) AS value
             FROM followers_demographics_daily fdd
@@ -1791,9 +1821,9 @@ def get_follower_age_gender_known_only(account_id):
             JOIN ad_account aa
               ON ia.business_id = aa.business_id
             JOIN latest_dt l
-              ON fdd.created_at::date = l.dt
+              ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
             WHERE aa.account_id = %(account_id)s
-              AND fdd.gender IN ('M', 'F')
+              AND TRIM(UPPER(COALESCE(fdd.gender, ''))) IN ('M', 'F')
               AND COALESCE(fdd.age_range, 'Unknown') <> 'Unknown'
             GROUP BY COALESCE(fdd.age_range, 'Unknown'), gender
         )
@@ -1815,34 +1845,49 @@ def get_follower_age_gender_known_only(account_id):
         END
     """
 
-    df = pd.read_sql(query, engine, params={"account_id": account_id})
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
     return None if df.empty else df
 
-def get_age_known_unknown_by_age(account_id):
+
+def get_age_known_unknown_by_age(account_id, date_start, date_end):
     engine = get_engine()
 
     query = """
         WITH latest_dt AS (
-            SELECT MAX(fdd.created_at::date) AS dt
+            SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS dt
             FROM followers_demographics_daily fdd
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
               ON ia.business_id = aa.business_id
             WHERE aa.account_id = %(account_id)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
         ),
         base AS (
             SELECT
                 COALESCE(fdd.age_range, 'Unknown') AS age_range,
-                SUM(CASE WHEN fdd.gender IN ('M', 'F') THEN fdd.value ELSE 0 END) AS known,
-                SUM(CASE WHEN fdd.gender NOT IN ('M', 'F') OR fdd.gender IS NULL THEN fdd.value ELSE 0 END) AS unknown
+            SUM(CASE 
+                WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) IN ('M', 'F') 
+                THEN fdd.value ELSE 0 END) AS known,
+            SUM(CASE 
+                WHEN TRIM(UPPER(COALESCE(fdd.gender, ''))) NOT IN ('M', 'F') 
+                THEN fdd.value ELSE 0 END) AS unknown
             FROM followers_demographics_daily fdd
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
               ON ia.business_id = aa.business_id
             JOIN latest_dt l
-              ON fdd.created_at::date = l.dt
+              ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
             WHERE aa.account_id = %(account_id)s
               AND COALESCE(fdd.age_range, 'Unknown') <> 'Unknown'
             GROUP BY COALESCE(fdd.age_range, 'Unknown')
@@ -1864,5 +1909,80 @@ def get_age_known_unknown_by_age(account_id):
         END
     """
 
-    df = pd.read_sql(query, engine, params={"account_id": account_id})
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
+    return None if df.empty else df
+
+def get_follower_age_gender_distribution(account_id, date_start, date_end):
+    engine = get_engine()
+
+    query = """
+        WITH latest_dt AS (
+            SELECT MAX((fdd.created_at AT TIME ZONE 'Asia/Seoul')::date) AS dt
+            FROM followers_demographics_daily fdd
+            JOIN ig_account ia
+              ON fdd.ig_id = ia.ig_id
+            JOIN ad_account aa
+              ON ia.business_id = aa.business_id
+            WHERE aa.account_id = %(account_id)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
+              AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
+        ),
+        base AS (
+            SELECT
+                TRIM(COALESCE(fdd.age_range, 'Unknown')) AS age_range,
+                TRIM(UPPER(COALESCE(fdd.gender, ''))) AS gender,
+                SUM(fdd.value) AS value
+            FROM followers_demographics_daily fdd
+            JOIN ig_account ia
+              ON fdd.ig_id = ia.ig_id
+            JOIN ad_account aa
+              ON ia.business_id = aa.business_id
+            JOIN latest_dt l
+              ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
+            WHERE aa.account_id = %(account_id)s
+              AND TRIM(COALESCE(fdd.age_range, 'Unknown')) <> 'Unknown'
+            GROUP BY age_range, gender
+        )
+        SELECT
+            age_range,
+
+            -- 전체 (unknown 포함)
+            SUM(value) AS total,
+
+            -- 남/여만
+            COALESCE(SUM(CASE WHEN gender = 'M' THEN value END), 0) AS male,
+            COALESCE(SUM(CASE WHEN gender = 'F' THEN value END), 0) AS female
+
+        FROM base
+        GROUP BY age_range
+        ORDER BY CASE age_range
+            WHEN '13-17' THEN 1
+            WHEN '18-24' THEN 2
+            WHEN '25-34' THEN 3
+            WHEN '35-44' THEN 4
+            WHEN '45-54' THEN 5
+            WHEN '55-64' THEN 6
+            WHEN '65+' THEN 7
+            ELSE 99
+        END
+    """
+
+    df = pd.read_sql(
+        query,
+        engine,
+        params={
+            "account_id": account_id,
+            "date_start": date_start,
+            "date_end": date_end,
+        },
+    )
+
     return None if df.empty else df
