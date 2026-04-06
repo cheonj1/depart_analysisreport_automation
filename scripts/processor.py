@@ -1603,7 +1603,7 @@ def has_follower_demographics_data(account_id, date_start, date_end):
         JOIN ig_account ia
           ON fdd.ig_id = ia.ig_id
         JOIN ad_account aa
-          ON ia.business_id = aa.business_id
+          ON ia.ig_user_id = aa.ig_user_id
         WHERE aa.account_id = %(account_id)s
           AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
           AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1631,7 +1631,7 @@ def get_follower_demographics_latest_date(account_id, date_start, date_end):
         JOIN ig_account ia
           ON fdd.ig_id = ia.ig_id
         JOIN ad_account aa
-          ON ia.business_id = aa.business_id
+          ON ia.ig_user_id = aa.ig_user_id
         WHERE aa.account_id = %(account_id)s
           AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
           AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1683,7 +1683,7 @@ def get_demographics_ratio(account_id, date_start, date_end, dimension="gender",
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
-                  ON ia.business_id = aa.business_id
+                  ON ia.ig_user_id = aa.ig_user_id
                 WHERE aa.account_id = %(account_id)s
                   AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
                   AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1696,7 +1696,7 @@ def get_demographics_ratio(account_id, date_start, date_end, dimension="gender",
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
-                  ON ia.business_id = aa.business_id
+                  ON ia.ig_user_id = aa.ig_user_id
                 JOIN latest_dt l
                   ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
                 WHERE aa.account_id = %(account_id)s
@@ -1723,7 +1723,7 @@ def get_demographics_ratio(account_id, date_start, date_end, dimension="gender",
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
-                  ON ia.business_id = aa.business_id
+                  ON ia.ig_user_id = aa.ig_user_id
                 WHERE aa.account_id = %(account_id)s
                   AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
                   AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1739,7 +1739,7 @@ def get_demographics_ratio(account_id, date_start, date_end, dimension="gender",
                 JOIN ig_account ia
                   ON fdd.ig_id = ia.ig_id
                 JOIN ad_account aa
-                  ON ia.business_id = aa.business_id
+                  ON ia.ig_user_id = aa.ig_user_id
                 JOIN latest_dt l
                   ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
                 WHERE aa.account_id = %(account_id)s
@@ -1802,7 +1802,7 @@ def get_follower_age_gender_known_only(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             WHERE aa.account_id = %(account_id)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1819,7 +1819,7 @@ def get_follower_age_gender_known_only(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             JOIN latest_dt l
               ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
             WHERE aa.account_id = %(account_id)s
@@ -1867,7 +1867,7 @@ def get_age_known_unknown_by_age(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             WHERE aa.account_id = %(account_id)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1885,7 +1885,7 @@ def get_age_known_unknown_by_age(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             JOIN latest_dt l
               ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
             WHERE aa.account_id = %(account_id)s
@@ -1930,7 +1930,7 @@ def get_follower_age_gender_distribution(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             WHERE aa.account_id = %(account_id)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date >= %(date_start)s
               AND (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date <= %(date_end)s
@@ -1944,7 +1944,7 @@ def get_follower_age_gender_distribution(account_id, date_start, date_end):
             JOIN ig_account ia
               ON fdd.ig_id = ia.ig_id
             JOIN ad_account aa
-              ON ia.business_id = aa.business_id
+              ON ia.ig_user_id = aa.ig_user_id
             JOIN latest_dt l
               ON (fdd.created_at AT TIME ZONE 'Asia/Seoul')::date = l.dt
             WHERE aa.account_id = %(account_id)s
