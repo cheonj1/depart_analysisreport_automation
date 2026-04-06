@@ -26,10 +26,10 @@ DEFAULT_THEME = "#4e73df"
 def _configure_matplotlib_fonts() -> None:
     # Prefer Korean-capable fonts to avoid broken glyphs in SVG.
     preferred = [
-        #"Apple SD Gothic Neo",
+        "Apple SD Gothic Neo",
         "Noto Sans KR",
         "Malgun Gothic",
-        #"Arial Unicode MS",
+        "Arial Unicode MS",
         "DejaVu Sans",
     ]
     plt.rcParams["font.family"] = preferred
