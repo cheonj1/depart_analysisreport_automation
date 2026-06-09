@@ -42,10 +42,16 @@ _ENGLISH_FUNCTION_WORDS = {
     "me", "my",
     "do", "did", "does",
 }
-_KIWI_EXCLUDE_PREFIXES = ("J", "E")
+_KIWI_EXCLUDE_PREFIXES = ("J", "E", "VV", "VA", "VX")
+# VV*/VA*/VX* 추가: '조이(VV)', '주(VX)' 등 동사/보조동사 어간이 명사로 오추출되는 것 방지
+# ("VV" prefix → VV, VV-R, VV-I 모두 포함; "VA" → VA, VA-R, VA-I 포함)
+# 인접 토큰 병합 시도 시 두 번째 토큰(t_next)이 이 태그 집합에 속해야만 병합 가능.
+# 기능 형태소(XSA-I, EF 등)가 t_next가 되면 '스럽지' 같은 오결합을 방지한다.
+_MERGE_NEXT_ALLOWED_TAGS = {"NNG", "NNP", "NNB", "IC", "XR", "XSN", "SL"}
 _KIWI_EXCLUDE_TAGS = {
     "SF", "SP", "SS", "SE", "SO", "SW",
     "EC", "EF", "EP", "ETM", "ETN",
+    "IC",  # 감탄사 — '아우터'→'아우'(IC)+'터' 처럼 외래어가 부분 추출되는 오류 방지
     "SL",  # 외국어(영어) → _extract_english 단계에서 lemmatization 포함 처리
 }
 
@@ -191,15 +197,45 @@ class AdNounExtractor:
     def _extract_korean(self, processed: str, seen: set) -> list:
         """한국어: Kiwi 형태소 분석 (SL 제외로 영어 중복 방지)"""
         result = []
-        for t in self.kiwi.tokenize(processed):
+        tokens = list(self.kiwi.tokenize(processed))
+        i = 0
+        while i < len(tokens):
+            t = tokens[i]
+
+            # exclude 필터보다 먼저 인접 토큰 병합 시도
+            # '아우터가' → '아우'(IC/NNG)+'터'(NNB/NNG) 조합이 단일 명사(NNG/NNP)이면 병합
+            if i + 1 < len(tokens):
+                t_next = tokens[i + 1]
+                if t.start + t.len == t_next.start and str(t_next.tag) in _MERGE_NEXT_ALLOWED_TAGS:
+                    combined = re.sub(r"[^가-힣a-zA-Z0-9]", "", t.form + t_next.form)
+                    if combined and all('가' <= c <= '힣' for c in combined):
+                        merged = False
+                        for toks, _ in self.kiwi.analyze(combined, top_n=3):
+                            if (len(toks) == 1
+                                    and toks[0].form == combined
+                                    and str(toks[0].tag) in ("NNG", "NNP")):
+                                norm = combined.lower()
+                                if len(combined) >= 2 and norm not in seen and not norm.isdigit():
+                                    result.append(combined)
+                                    seen.add(norm)
+                                i += 2
+                                merged = True
+                                break
+                        if merged:
+                            continue
+
+            # 병합 없음 → 단독 토큰 처리
             if t.tag in _KIWI_EXCLUDE_TAGS or t.tag.startswith(_KIWI_EXCLUDE_PREFIXES):
+                i += 1
                 continue
             cleaned = re.sub(r"[^가-힣a-zA-Z0-9]", "", t.form)
             norm = cleaned.lower()
-            if len(cleaned) < 2 or not norm or norm in seen:
+            if len(cleaned) < 2 or not norm or norm in seen or norm.isdigit():
+                i += 1
                 continue
             result.append(cleaned)
             seen.add(norm)
+            i += 1
         return result
 
     def extract_words(self, text: str, debug=False):
@@ -397,8 +433,14 @@ def lambda_handler(event, context):
         if not all([db_host, db_user, db_password, db_name]):
             raise ValueError("Missing DB env")
 
-        raw_custom_dict = os.environ.get("CUSTOM_DICT", "")
-        custom_dict = [w.strip() for w in raw_custom_dict.split(",") if w.strip()]
+        # Kiwi가 오분석하는 패션·뷰티 외래어 기본 사전 (CUSTOM_DICT 환경변수로 추가 가능)
+    _BASE_FASHION_DICT = [
+        "아우터", "이너웨어", "레이어드", "니트웨어", "캐주얼웨어",
+        "스킨케어", "헤어케어", "바디케어", "선케어",
+        "오버핏", "슬림핏", "레귤러핏",
+    ]
+    raw_custom_dict = os.environ.get("CUSTOM_DICT", "")
+        custom_dict = _BASE_FASHION_DICT + [w.strip() for w in raw_custom_dict.split(",") if w.strip()]
 
         BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 50))
         DEBUG = env_bool("DEBUG", "false")
