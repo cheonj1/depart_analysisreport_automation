@@ -604,13 +604,34 @@ def run(target_id, fb_ad_account_id, start, end, main_age="", main_gender="", av
             })
         return items
 
-    def build_appendix_full_item(base_title, subtitle, headers, df, col_indices):
+    def build_appendix_essential_items(base_title, subtitle, headers, df, col_indices):
         """
-        별첨 표를 등장한 전체 키워드(전체 순위)로 1개 생성.
+        업종 필수 키워드 별첨 표 생성.
+        35개 초과 시 1~25위 / 26~전체 두 페이지로 분할, 이하면 전체 1페이지.
         """
         rows = format_rows(df, col_indices)
         if not rows:
             return []
+        total = len(rows)
+        if total > 35:
+            first_rows = [[i + 1] + row for i, row in enumerate(rows[:25])]
+            rest_rows = [[i + 26] + row for i, row in enumerate(rows[25:])]
+            return [
+                {
+                    "title": f"{base_title} (1~25위)",
+                    "subtitle": subtitle,
+                    "headers": headers,
+                    "rows": first_rows,
+                    "footnote": "*등장한 전체 키워드 기준"
+                },
+                {
+                    "title": f"{base_title} (26~{total}위)",
+                    "subtitle": subtitle,
+                    "headers": headers,
+                    "rows": rest_rows,
+                    "footnote": "*등장한 전체 키워드 기준"
+                },
+            ]
         ranked_rows = [[i + 1] + row for i, row in enumerate(rows)]
         return [{
             "title": f"{base_title} (전체)",
@@ -623,14 +644,14 @@ def run(target_id, fb_ad_account_id, start, end, main_age="", main_gender="", av
     # 가공된 아이템 리스트 생성
     print("아이템 리스트 생성 중...")
     appendix_items = []
-    appendix_items.extend(build_appendix_full_item(
+    appendix_items.extend(build_appendix_essential_items(
         base_title="많이 사용한 업종 필수 키워드 - 노출",
         subtitle="키워드가 가장 많이 노출된 타겟",
         headers=["랭킹", "키워드", "등장 광고 수", "최다 노출 타겟", "타겟 노출량", "노출 비중", "총 노출량"],
         df=df_ess,
         col_indices=[0, 1, 2, 3, 4, 5]
     ))
-    appendix_items.extend(build_appendix_full_item(
+    appendix_items.extend(build_appendix_essential_items(
         base_title="많이 사용한 업종 필수 키워드 - 클릭",
         subtitle="키워드가 가장 많이 노출된 타겟",
         headers=["랭킹", "키워드", "등장 광고 수", "최다 클릭 타겟", "타겟 클릭량", "클릭 비중", "총 클릭량"],
